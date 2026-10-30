@@ -58,12 +58,29 @@ const CONTACT: Record<string, [number, number]> = {
   gcb1: [130, 170],
   gcb2: [1030, 170],
   tie: [580, 248],
-  apu1: [430, 140],
-  ext2: [730, 140],
+  apu1: [430, 148],
+  ext2: [730, 148],
   batContactor: [275, 735],
   dcTie: [580, 515],
   acessFeed: [420, 330],
   dcessFeed: [420, 610],
+};
+const CONTACT_LABEL: Record<string, string> = {
+  gcb1: "GCB 1",
+  gcb2: "GCB 2",
+  tie: "BUS TIE",
+  apu1: "APU → AC 1",
+  ext2: "EXT → AC 2",
+  batContactor: "BAT CONTACTOR",
+  dcTie: "DC TIE",
+  acessFeed: "AC ESS FEED",
+  dcessFeed: "DC ESS FEED",
+};
+// Default label sits above the contactor; these would land on a node caption there.
+const CONTACT_LABEL_AT: Record<string, [number, number, "start" | "middle"]> = {
+  apu1: [27, 3, "start"],
+  ext2: [27, 3, "start"],
+  dcTie: [0, 31, "middle"],
 };
 export type Level = "BASIC" | "ENGINEERING" | "MAINTENANCE";
 export function Synoptic({
@@ -141,7 +158,7 @@ export function Synoptic({
       </div>
       <div className="diagram-scroll">
         <svg
-          viewBox="0 0 1160 920"
+          viewBox="0 0 1160 940"
           style={{ width: `${zoom * 100}%` }}
           role="img"
           aria-label="Canlı AC DC dağıtım şeması; bileşenler ve kontaktörler tıklanabilir"
@@ -167,7 +184,7 @@ export function Synoptic({
               <path d="M0 0 L10 5 L0 10Z" fill="context-stroke" />
             </marker>
           </defs>
-          <rect x="0" y="0" width="1160" height="920" fill="url(#dots)" />
+          <rect x="0" y="0" width="1160" height="940" fill="url(#dots)" />
           <text className="section-label" x="32" y="27">
             GENERATION
           </text>
@@ -216,6 +233,7 @@ export function Synoptic({
           {Object.entries(CONTACT).map(([id, [x, y]]) => {
             const e = q.edges.find((e) => e.id === id);
             if (!e) return null;
+            const [lx, ly, anchor] = CONTACT_LABEL_AT[id] ?? [0, -24, "middle"];
             return (
               <g
                 key={id}
@@ -238,8 +256,8 @@ export function Synoptic({
                 <path d={e.closed ? "M-10,0 H10" : "M-10,0 L8,-11"} />
                 <title>{e.reason}</title>
                 {level !== "BASIC" && (
-                  <text y="-24" textAnchor="middle">
-                    {id === "tie" ? "BUS TIE" : id.toUpperCase()}
+                  <text x={lx} y={ly} textAnchor={anchor}>
+                    {CONTACT_LABEL[id] ?? id}
                   </text>
                 )}
               </g>
@@ -339,7 +357,7 @@ export function Synoptic({
               MAINTENANCE · Seçilen bileşenin ölçümünü sağ panelden al.
             </text>
           )}
-          <text className="diagram-footnote" x="1130" y="900" textAnchor="end">
+          <text className="diagram-footnote" x="1130" y="930" textAnchor="end">
             GENERIC TWIN-ENGINE · NO AC PARALLELING
           </text>
         </svg>

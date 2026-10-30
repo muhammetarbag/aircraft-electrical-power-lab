@@ -700,6 +700,10 @@
   .node-detail {
     fill: #8ca5be;
     font: 9px var(--mono);
+    paint-order: stroke;
+    stroke: var(--panel);
+    stroke-width: 4px;
+    stroke-linejoin: round;
   }
   .source-symbol {
     fill: currentColor;
@@ -747,6 +751,10 @@
   .svg-contactor text {
     fill: #8da4bd;
     font: 9px var(--mono);
+    paint-order: stroke;
+    stroke: var(--panel);
+    stroke-width: 4px;
+    stroke-linejoin: round;
   }
   .svg-contactor.active {
     color: var(--cyan);
