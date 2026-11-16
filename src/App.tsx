@@ -512,6 +512,8 @@ export default function App() {
                 <ol className="procedure">
                   <li>
                     GCU: gerilim, frekans ve faz koşullarını kontrol eder.
+                    Normal band 108–118 V / 393–407 Hz; &lt;100 / &gt;125 V veya
+                    &lt;380 / &gt;420 Hz trip kilitlenir, reset gerekir.
                   </li>
                   <li>
                     Bus / feeder short: etkilenen alan anında izole edilir.

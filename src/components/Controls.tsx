@@ -331,7 +331,9 @@ export function SourceControls({
                 />
               )}
               <p className="muted">
-                Eğitim GCU bandı: 108–122 V / 380–420 Hz. Sıcaklık:{" "}
+                Normal band (MIL-STD-704F): 108–118 V / 393–407 Hz. GCU trip:
+                &lt;100 / &gt;125 V, &lt;380 / &gt;420 Hz; trip kilitlenir,
+                koruma reseti veya kaynak OFF → ON gerekir. Sıcaklık:{" "}
                 {fmt(r.temperature)} °C. Gerilimler RMS; IDG 4 kutuplu kavramsal
                 tahrik.
               </p>
@@ -508,8 +510,10 @@ export function TransferControls({
       />
       <Note>
         Öncelik: motor jeneratörü → yerde GPU → APU → seçilmiş standby için
-        batarya. CLOSED tie, ikinci AC kaynağını interlock ile ayırır. DC tie
-        yalnız tek TRU kaldığında transfer sağlar.
+        batarya. GPU/APU yalnız jeneratörü devre dışı olan barayı alır; diğer
+        jeneratör kendi barasında kalır (split bus, paralelleme yok). CLOSED
+        tie, ikinci AC kaynağını interlock ile ayırır. DC tie yalnız tek TRU
+        kaldığında transfer sağlar.
       </Note>
     </Panel>
   );

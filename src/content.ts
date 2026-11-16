@@ -157,7 +157,8 @@ export const LABS: Lab[] = [
           q.nodes.avionics.powered &&
           q.nodes.fuelRight.powered &&
           q.battery.mode === "CHARGING",
-        observation: "TRU 1 ve TRU 2 DC dağıtımı; DC BUS 2 şarj hattı.",
+        observation:
+          "TRU 1 ve TRU 2 DC dağıtımı; şarj cihazı AC BUS 2’den beslenir.",
       },
     ],
     question: "İki jeneratör çalışırken AUTO tie neden açık?",
@@ -388,7 +389,7 @@ export const CASES = [
       "İki jeneratör aynı anda aşırı frekansta",
       "Hot Battery beslemesi kapalı",
     ],
-    hint: "DC BUS 2 ve şarj girişinin kullanılabilirliğini karşılaştır.",
+    hint: "AC BUS 2 ve şarj girişinin kullanılabilirliğini karşılaştır.",
   },
   {
     title: "GENERATOR OVERLOAD",
@@ -412,7 +413,7 @@ export const CASES = [
       "Galley anahtarı OFF",
       "Batarya SOC yüksek",
     ],
-    hint: "EXT PWR frekansını ölç; eğitim kabul aralığı 380–420 Hz.",
+    hint: "EXT PWR frekansını ölç; normal band 393–407 Hz, kabul sınırı 380–420 Hz.",
   },
   {
     title: "ESSENTIAL BUS UNPOWERED",
@@ -452,7 +453,8 @@ export const CASES = [
   },
   {
     title: "INTERMITTENT GENERATOR",
-    complaint: "GEN 1 düzenli aralıklarla ayrılıyor ve geri geliyor.",
+    complaint:
+      "GEN 1 ayrıldı; koruma reseti sonrası bir süre çalışıp yeniden ayrılıyor.",
     faults: ["intermittent"],
     answer: "GEN 1 aralıklı düşük gerilim koşulu",
     options: [
@@ -460,7 +462,7 @@ export const CASES = [
       "GPU kablosu bağlı",
       "Normal batarya şarjı",
     ],
-    hint: "En az 12 simülasyon saniyesi gözle; gerilim ile olay zamanlarını karşılaştır.",
+    hint: "Olay kaydındaki GCU TRIP nedenini oku; reset sonrası gerilimi en az 12 simülasyon saniyesi izle.",
   },
 ];
 export function caseState(index: number): State {
@@ -581,7 +583,7 @@ export const QUESTIONS: Question[] = [
     "115 V / 330 Hz GPU için beklenen sonuç?",
     "Bağlantı reddedilir",
     ["Normal bağlantı", "TRU frekansı otomatik 400 Hz yapar"],
-    "Bu eğitim modelinde kabul aralığı 380–420 Hz.",
+    "Normal band 393–407 Hz (MIL-STD-704F); bu modelde 380–420 Hz dışı kaynak reddedilir.",
   ),
   mc(
     "External",
@@ -802,7 +804,7 @@ export const COMPONENTS = [
     "Kaynak kalitesini denetler ve koruma komutlarını üretir.",
     "Gerilim, frekans, faz ve yük ölçümleri",
     "Excitation / kontaktör izinleri",
-    "108–122 V · 380–420 Hz eğitim bandı",
+    "Normal 108–118 V · 393–407 Hz; trip <100 / >125 V, <380 / >420 Hz (kilitli)",
     "Kalite reddi / kontrol arızası",
     "Uygun olmayan kaynak ağdan ayrılır.",
     "gen1",
@@ -869,8 +871,8 @@ export const COMPONENTS = [
   ],
   [
     "Battery Charger",
-    "Uygun DC beslemeden batarya enerjisini yeniler.",
-    "DC BUS 2",
+    "AC BUS 2 (transfer bus) enerjisiyle bataryayı DC olarak şarj eder.",
+    "AC BUS 2 · 115 V / 400 Hz",
     "500 W giriş, 450 W bataryaya",
     "BAT ON, sağlıklı kontaktör, SOC < %100",
     "Şarj yolu arızası",
