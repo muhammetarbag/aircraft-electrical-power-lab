@@ -7,6 +7,7 @@ import {
   MODULES,
   QUESTIONS,
   caseState,
+  gradeAnswer,
 } from "../src/content.ts";
 import { act, advance, createState, solve } from "../src/sim/engine.ts";
 import type { Action, State } from "../src/sim/types.ts";
@@ -45,6 +46,19 @@ test("all ten diagnosis cases produce their advertised deterministic symptoms", 
     assert.equal(caseState(i).events.length, 1);
     assert.ok(CASES[i].options.includes(CASES[i].answer));
   }
+});
+test("quiz grades numeric answers by value and keeps text answers exact", () => {
+  const numeric = QUESTIONS.find((q) => q.answer === "30" && !q.options)!;
+  for (const value of ["30", " 30.0 ", "30,0"])
+    assert.ok(gradeAnswer(numeric, value), value);
+  for (const value of ["", "3", "300", "30 dk"])
+    assert.ok(!gradeAnswer(numeric, value), value);
+  const order = QUESTIONS.find((q) => q.category.includes("sıralama"))!;
+  assert.ok(gradeAnswer(order, "gen 1,ac bus 1, tru 1 ,dc bus 1"));
+  assert.ok(!gradeAnswer(order, "GEN 1, TRU 1, AC BUS 1, DC BUS 1"));
+  const choice = QUESTIONS.find((q) => q.options)!;
+  assert.ok(gradeAnswer(choice, choice.answer));
+  assert.ok(!gradeAnswer(choice, choice.options![1]));
 });
 type Step = Action | number;
 const sw = (key: "batteryOn" | "gpuCable" | "gpuOn" | "apuMaster"): Action => ({
