@@ -12,10 +12,16 @@ import type {
 } from "./types.ts";
 
 export const LIMITS = {
-  minV: 108,
-  maxV: 122,
-  minF: 380,
-  maxF: 420,
+  // MIL-STD-704F Table I normal steady-state band for 115 V / 400 Hz.
+  normalMinV: 108,
+  normalMaxV: 118,
+  normalMinF: 393,
+  normalMaxF: 407,
+  // GCU trip thresholds = MIL-STD-704F abnormal steady-state limits. Beyond them the source trips and latches.
+  tripUV: 100,
+  tripOV: 125,
+  tripUF: 380,
+  tripOF: 420,
   overloadSeconds: 5,
   truKW: 5,
   truTripTemp: 110,
@@ -103,6 +109,22 @@ export function createState(preset: Preset = "normal"): State {
   return s;
 }
 
+export const normalQuality = (voltage: number, frequency: number) =>
+  voltage >= LIMITS.normalMinV &&
+  voltage <= LIMITS.normalMaxV &&
+  frequency >= LIMITS.normalMinF &&
+  frequency <= LIMITS.normalMaxF;
+/** The GCU protection function a reading would trip, or null inside the abnormal limits. */
+export const protectionFault = (voltage: number, frequency: number) =>
+  voltage < LIMITS.tripUV
+    ? `UNDERVOLTAGE: ${voltage} V < ${LIMITS.tripUV} V.`
+    : voltage > LIMITS.tripOV
+      ? `OVERVOLTAGE: ${voltage} V > ${LIMITS.tripOV} V.`
+      : frequency < LIMITS.tripUF
+        ? `UNDERFREQUENCY: ${frequency} Hz < ${LIMITS.tripUF} Hz.`
+        : frequency > LIMITS.tripOF
+          ? `OVERFREQUENCY: ${frequency} Hz > ${LIMITS.tripOF} Hz.`
+          : null;
 function sourceQuality(s: State, id: SourceId): SourceReading {
   const c = s.sources[id];
   const index = id === "gen1" ? 0 : 1;
@@ -138,24 +160,17 @@ function sourceQuality(s: State, id: SourceId): SourceReading {
   else if (tripped(s, id))
     reason = "Koruma TRIPPED; neden giderildikten sonra eğitim reseti gerekli.";
   else if (!phase) reason = "Faz sırası / faz bütünlüğü uygun değil.";
-  else if (voltage < LIMITS.minV)
-    reason = `UNDERVOLTAGE: ${voltage} V < ${LIMITS.minV} V.`;
-  else if (voltage > LIMITS.maxV)
-    reason = `OVERVOLTAGE: ${voltage} V > ${LIMITS.maxV} V.`;
-  else if (frequency < LIMITS.minF)
-    reason = `UNDERFREQUENCY: ${frequency} Hz < ${LIMITS.minF} Hz.`;
-  else if (frequency > LIMITS.maxF)
-    reason = `OVERFREQUENCY: ${frequency} Hz > ${LIMITS.maxF} Hz.`;
+  else if (protectionFault(voltage, frequency))
+    reason = protectionFault(voltage, frequency)!;
+  else if (!normalQuality(voltage, frequency))
+    reason = `ABNORMAL: ${voltage} V / ${frequency} Hz normal band (${LIMITS.normalMinV}–${LIMITS.normalMaxV} V, ${LIMITS.normalMinF}–${LIMITS.normalMaxF} Hz) dışında; koruma eşiği aşılmadı.`;
   const available =
     rotating &&
     c.on &&
     !failed &&
     !tripped(s, id) &&
     phase &&
-    voltage >= LIMITS.minV &&
-    voltage <= LIMITS.maxV &&
-    frequency >= LIMITS.minF &&
-    frequency <= LIMITS.maxF;
+    !protectionFault(voltage, frequency);
   return {
     available,
     connected: false,
@@ -326,15 +341,23 @@ function network(s: State, shed: string[]): Solution {
     g1 = false;
     g2 = false;
   }
-  const cross = tieAllowed && !short1 && !short2 && (g1 !== g2 || forceTie);
   const backup: SourceId | null =
-    !g1 && !g2 && !quarantineBoth && tieAllowed
+    !quarantineBoth && tieAllowed
       ? sources.ext.available && s.sources.ext.contactor && !has(s, "extOpen")
         ? "ext"
         : sources.apu.available && s.sources.apu.contactor
           ? "apu"
           : null
       : null;
+  // Split-bus: APU/EXT takes only a bus whose own generator is offline; the other generator keeps its bus.
+  // A forced-closed tie allows a single source only, so then backup feeds the buses only when both generators are off.
+  const backupFeeds = (side: 1 | 2) =>
+    !!backup &&
+    !(side === 1 ? g1 || short1 : g2 || short2) &&
+    (!forceTie || (!g1 && !g2));
+  const split = g1 !== g2 && (backupFeeds(1) || backupFeeds(2));
+  const cross =
+    tieAllowed && !short1 && !short2 && !split && (g1 !== g2 || forceTie);
   edge(
     "gcb1",
     "gen1",
@@ -379,7 +402,7 @@ function network(s: State, shed: string[]): Solution {
   );
   for (const id of ["apu", "ext"] as const)
     for (const side of [1, 2]) {
-      const active = backup === id && !(side === 1 ? short1 : short2);
+      const active = backup === id && backupFeeds(side as 1 | 2);
       edge(
         `${id}${side}`,
         id,
@@ -398,7 +421,7 @@ function network(s: State, shed: string[]): Solution {
     "tie",
     g2 ? "ac2" : "ac1",
     g2 ? "ac1" : "ac2",
-    s.tie === "CLOSED" || (s.tie === "AUTO" && g1 !== g2),
+    s.tie === "CLOSED" || (s.tie === "AUTO" && g1 !== g2 && !split),
     tieStuck || cross,
     tieStuck
       ? "STUCK CLOSED: mekanik olarak kapalı. Kaynak interlock / feeder koruması aktif."
@@ -598,16 +621,16 @@ function network(s: State, shed: string[]): Solution {
     !has(s, "batteryFail") &&
     !has(s, "chargerFail") &&
     soc(s) < 99.999 &&
-    nodes.dc2.powered;
+    nodes.ac2.powered;
   edge(
     "chargerFeed",
-    "dc2",
+    "ac2",
     "charger",
     s.charger,
     charge,
     charge
-      ? "DC BUS 2 üzerinden 500 W şarj cihazı; verim %90."
-      : "Şarj için DC BUS 2, BAT ON, kontaktör ve sağlıklı şarj cihazı gerekli.",
+      ? "AC BUS 2 (transfer bus) üzerinden 500 W şarj cihazı; verim %90."
+      : "Şarj için AC BUS 2, BAT ON, kontaktör ve sağlıklı şarj cihazı gerekli.",
   );
   edge(
     "starterFeed",
@@ -701,6 +724,11 @@ function network(s: State, shed: string[]): Solution {
     (id) => nodes[id].failed,
   );
   const overload = SOURCE_IDS.some((id) => sources[id].load > 100);
+  const abnormal = SOURCE_IDS.filter(
+    (id) =>
+      sources[id].connected &&
+      !normalQuality(sources[id].voltage, sources[id].frequency),
+  );
   const status: Solution["status"] =
     !essential || noMain
       ? "EMERGENCY"
@@ -715,7 +743,8 @@ function network(s: State, shed: string[]): Solution {
             !sources.gen1.connected ||
             !sources.gen2.connected ||
             shed.length ||
-            overload
+            overload ||
+            abnormal.length
           ? "DEGRADED"
           : "NORMAL";
   const statusReason = !essential
@@ -742,6 +771,10 @@ function network(s: State, shed: string[]): Solution {
           "BUS TIE STUCK CLOSED: kısa devreli ortak alan için her iki AC besleme engellendi.",
         ]
       : []),
+    ...abnormal.map(
+      (id) =>
+        `${NAMES[id]} ABNORMAL: ${sources[id].voltage} V / ${sources[id].frequency} Hz normal band dışında (koruma eşiği aşılmadı).`,
+    ),
     ...shed.map((id) => `${NAMES[id]} LOAD SHED`),
     ...(overload ? ["OVERLOAD: 5 s gecikmeli jeneratör koruması."] : []),
     ...(s.energyWh <= 0
@@ -864,6 +897,15 @@ function protection(s: State, q: Solution) {
       log(s, `${NAMES[id]} TRIPPED · sıcaklık / aşırı yük koruması.`, "fault");
     }
   }
+  // GCU-controlled sources latch OV/UV/OF/UF trips; only a reset or a GEN switch cycle clears them.
+  for (const id of ["gen1", "gen2", "apu"] as const) {
+    const r = q.sources[id],
+      cause = r.voltage > 0 ? protectionFault(r.voltage, r.frequency) : null;
+    if (cause && !tripped(s, id)) {
+      s.trips.push(id);
+      log(s, `${NAMES[id]} GCU TRIP · ${cause} Reset gerekli.`, "fault");
+    }
+  }
   for (const id of SOURCE_IDS)
     if (
       (s.timers[id] || 0) >= LIMITS.overloadSeconds &&
@@ -953,6 +995,9 @@ export function act(previous: State, action: Action): State {
           action.key === "frequency" ? 500 : action.key === "kva" ? 120 : 160,
         );
       else c[action.key] = !!action.value;
+      // Switching the source OFF is the GEN reset cycle: it clears that source's latched trip.
+      if (action.key === "on" && !action.value)
+        s.trips = s.trips.filter((id) => id !== action.id);
       log(s, `${NAMES[action.id]} ${action.key} → ${String(action.value)}`);
       break;
     }

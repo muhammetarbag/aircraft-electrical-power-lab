@@ -144,8 +144,14 @@ test("battery energy integrates actual power and is not reset each frame", () =>
 test("battery charges only when all charger paths are available", () => {
   const s = createState();
   assert.ok(advance(s, 20).energyWh > s.energyWh);
-  for (const f of ["chargerFail", "tru2Fail", "batteryOpen"])
+  for (const f of ["chargerFail", "ac2Short", "batteryOpen"])
     assert.equal(solve(fault(s, f)).battery.chargeWatts, 0);
+  // AC-fed charger (737-style): losing TRU 2 / DC BUS 2 does not stop charging.
+  const noTru2 = solve(fault(s, "tru2Fail"));
+  assert.equal(noTru2.nodes.dc2.powered, false);
+  assert.equal(noTru2.battery.chargeWatts, 450);
+  assert.equal(noTru2.nodes.charger.source, "gen2");
+  assert.ok(noTru2.nodes.charger.frequency > 0);
   s.charger = false;
   assert.ok(advance(s, 20).energyWh < s.energyWh);
 });
@@ -341,10 +347,17 @@ test("actual event log records bus source transfers and intermittent quality fai
   assert.ok(
     s.events.some((e) => e.text.includes("AC BUS 1 ENERGIZED ← GEN 2")),
   );
+  // The first dip trips and latches GEN 1: no self-reconnection when voltage recovers.
   s = advance(fault(createState(), "intermittent"), 25);
-  assert.ok(
-    s.events.filter((e) => e.text.includes("GEN 1 DISCONNECTED")).length >= 2,
-  );
+  const disconnects = (x: State) =>
+    x.events.filter((e) => e.text.includes("GEN 1 DISCONNECTED")).length;
+  assert.equal(disconnects(s), 1);
+  assert.ok(s.events.some((e) => e.text.includes("GEN 1 GCU TRIP")));
+  assert.equal(solve(s).sources.gen1.connected, false);
+  s = act(advance(s, 0.4), { type: "resetTrips" });
+  assert.equal(solve(s).sources.gen1.connected, true);
+  s = advance(s, 12);
+  assert.equal(disconnects(s), 2);
 });
 test("history contains real solved telemetry; zero time does not advance energy", () => {
   const s = advance(createState(), 4),
@@ -416,4 +429,99 @@ test("all load definitions have unique IDs and existing buses", () => {
   const q = solve(createState());
   assert.equal(new Set(LOADS.map((l) => l.id)).size, LOADS.length);
   for (const l of LOADS) assert.ok(q.nodes[l.bus]);
+});
+const gen1 = (
+  s: State,
+  key: "voltage" | "frequency" | "on",
+  value: number | boolean,
+) => act(s, { type: "source", id: "gen1", key, value });
+test("MIL-STD-704 normal band is separate from the protection trip limits", () => {
+  for (const [key, value] of [
+    ["voltage", 108],
+    ["voltage", 118],
+    ["frequency", 393],
+    ["frequency", 407],
+  ] as const) {
+    const q = solve(gen1(createState(), key, value));
+    assert.equal(q.sources.gen1.connected, true, `${key}=${value}`);
+    assert.equal(q.status, "NORMAL", `${key}=${value}`);
+  }
+  for (const [key, value] of [
+    ["voltage", 121],
+    ["voltage", 104],
+    ["frequency", 412],
+    ["frequency", 385],
+  ] as const) {
+    const s = gen1(createState(), key, value),
+      q = solve(s);
+    assert.equal(q.sources.gen1.connected, true, `${key}=${value}`);
+    assert.equal(q.status, "DEGRADED", `${key}=${value}`);
+    assert.ok(q.alerts.some((a) => a.startsWith("GEN 1 ABNORMAL")));
+    assert.equal(s.trips.length, 0);
+  }
+  for (const [key, value] of [
+    ["voltage", 126],
+    ["voltage", 99],
+    ["frequency", 421],
+    ["frequency", 379],
+  ] as const) {
+    const s = gen1(createState(), key, value);
+    assert.ok(s.trips.includes("gen1"), `${key}=${value}`);
+    assert.equal(solve(s).sources.gen1.connected, false);
+  }
+});
+test("GCU OV/UV trip stays latched until protection reset or GEN switch cycle", () => {
+  let s = gen1(createState(), "voltage", 130);
+  assert.ok(s.trips.includes("gen1"));
+  s = advance(gen1(s, "voltage", 115), 30);
+  assert.equal(solve(s).sources.gen1.connected, false);
+  assert.equal(
+    solve(act(s, { type: "resetTrips" })).sources.gen1.connected,
+    true,
+  );
+  const cycled = gen1(gen1(s, "on", false), "on", true);
+  assert.equal(solve(cycled).sources.gen1.connected, true);
+  let f = fault(createState(), "gen1UnderV");
+  f = advance(fault(f, "gen1UnderV"), 10);
+  assert.equal(solve(f).sources.gen1.connected, false);
+  // Reset while the fault is still present re-trips at once.
+  const early = act(fault(createState(), "gen1OverF"), { type: "resetTrips" });
+  assert.ok(early.trips.includes("gen1"));
+});
+const apuOnline = (s: State) => {
+  s.apuMaster = true;
+  s.apuRpm = 100;
+  s.sources.apu.on = s.sources.apu.contactor = true;
+  return s;
+};
+test("APU feeds only the bus whose generator is offline (split bus, no paralleling)", () => {
+  const s = fault(apuOnline(createState()), "gen1Fail"),
+    q = solve(s);
+  assert.equal(q.nodes.ac1.source, "apu");
+  assert.equal(q.nodes.ac2.source, "gen2");
+  assert.equal(q.edges.find((e) => e.id === "tie")!.closed, false);
+  assert.equal(q.edges.find((e) => e.id === "apu2")!.active, false);
+  assert.ok(
+    q.sources.gen2.load <
+      solve(fault(createState(), "gen1Fail")).sources.gen2.load,
+  );
+  // A forced-closed tie allows a single source: GEN 2 then carries both buses.
+  const closed = solve(act(s, { type: "tie", value: "CLOSED" }));
+  assert.equal(closed.nodes.ac1.source, "gen2");
+  assert.equal(closed.sources.apu.connected, false);
+  // Both generators off: APU takes both buses as before.
+  const both = solve(fault(apuOnline(createState()), "bothGen"));
+  assert.equal(both.nodes.ac1.source, "apu");
+  assert.equal(both.nodes.ac2.source, "apu");
+});
+test("EXT power splits the same way on the ground", () => {
+  let s = gpu();
+  for (const side of [0, 1] as const) s = act(s, { type: "engine", side });
+  s = advance(s, 8);
+  s = act(s, { type: "source", id: "gen2", key: "on", value: true });
+  s = act(s, { type: "source", id: "gen2", key: "contactor", value: true });
+  const q = solve(s);
+  assert.equal(q.nodes.ac2.source, "gen2");
+  assert.equal(q.nodes.ac1.source, "ext");
+  assert.equal(q.edges.find((e) => e.id === "tie")!.closed, false);
 });

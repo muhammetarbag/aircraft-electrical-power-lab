@@ -64,8 +64,8 @@ Her enerjili düğüm `source`, `path` ve `edgePath` taşır. Animasyon yalnız 
 | AC akımı | `P / (3 × Vphase × 0.9)`; standby instruments tek faz kabul edilir |
 | DC | TRU çıkışı 28 V; `I = P / V` |
 | Kaynaklar | Motor jeneratörü 30 kVA, APU 45 kVA, GPU 60 kVA; ayarlanabilir, PF 0.90 |
-| Kalite bandı | 108–122 V ve 380–420 Hz; faz koşulu sağlanmalı |
-| Öncelik | Motor jeneratörü → yerde geçerli GPU → APU; seçilmiş standby için batarya |
+| Kalite bandı | Normal band MIL-STD-704F: 108–118 V, 393–407 Hz (dışında ABNORMAL uyarısı, bağlı kalır). GCU trip: <100 / >125 V, <380 / >420 Hz (MIL-STD-704F abnormal sınırları); GEN 1/2 ve APU trip’i kilitlenir, koruma reseti veya kaynak OFF→ON gerekir. GPU bu sınırlar dışında bağlanmaz. Faz koşulu sağlanmalı |
+| Öncelik | Motor jeneratörü → yerde geçerli GPU → APU; seçilmiş standby için batarya. GPU/APU yalnız jeneratörü devre dışı olan barayı besler, diğer jeneratör kendi barasında kalır (split bus); CLOSED tie tek kaynağa zorlar |
 | AC tie | İki jeneratör normalde ayrı; CLOSED komutunda ikinci kaynak interlock ile açılır. Senkron paralelleme yok |
 | DC tie | Normalde OPEN. AUTO/CLOSED yalnız tek TRU kaldığında alternatif DC transfer yapar; TRU paralelleme yok |
 | Essential | AC ESS: AC1→AC2; AC STANDBY: AC ESS→inverter. DC ESS: DC1→DC2→Battery Bus |
@@ -73,7 +73,7 @@ Her enerjili düğüm `source`, `path` ve `edgePath` taşır. Animasyon yalnız 
 | Hot Battery | Ana BAT switch ve kontaktörden bağımsız doğrudan sigortalı hat |
 | Batarya | 24 V × 40 Ah = 960 Wh başlangıç kapasitesi; başlangıç SOC %85. `E -= netW × dt / 3600` |
 | Batarya gerilimi | `22 + 4 × SOC_fraction` V açık devre yaklaşımı; 0,012 Ω eğitim katsayısıyla yüke bağlı terminal gerilimi. Wh durumu kullanılabilir terminal enerjisidir; kimya modeli yok |
-| Şarj | DC BUS 2 üzerinden 500 W giriş, %90 verimle 450 W; ana BAT yolu sağlıklı ve SOC <%100 |
+| Şarj | AC BUS 2 (737 tipi transfer bus) üzerinden 500 W giriş, %90 verimle 450 W; ana BAT yolu sağlıklı ve SOC <%100 |
 | TRU | %92 sabit verim; 5 kW çıkış kapasitesi; ≥110 °C veya >5 kW / 5 s kilitli trip |
 | Inverter | %88 sabit verim; normal AC kaybında Battery Bus üzerinden 115 V / 400 Hz |
 | APU start | Battery Bus üzerinden 2 kW starter, +%5 RPM/s, ≥%95 kullanılabilir. Self-sustaining hızdan önce besleme kaybıyla yavaşlar |
