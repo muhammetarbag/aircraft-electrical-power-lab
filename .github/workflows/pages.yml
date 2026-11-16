@@ -2,7 +2,7 @@ name: Validate and publish Aircraft Electrical Power Lab
 
 on:
   push:
-    branches: [codex/aircraft-electrical-power-lab]
+    branches: [main]
   pull_request:
   workflow_dispatch:
 
