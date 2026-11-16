@@ -98,7 +98,7 @@ Bu kaynaklar yukarıdaki seçilmiş sayısal eğitim limitlerini veya kontaktör
 
 `npm run build` statik çıktıyı `dist/` altında üretir. `base: './'`, yerel fontlar ve `.nojekyll` sayesinde hem kökte hem repo alt yolunda çalışır. İnternet fontu veya backend isteği yoktur.
 
-Bağımsız repo olarak yayınlanırken `.github/workflows/pages.yml` test, format, typecheck, build ve Chromium UI doğrulamasını deploy önüne koyar. GitHub repository **Settings → Pages → Source: GitHub Actions** seçili olmalıdır. Workflow `codex/aircraft-electrical-power-lab` push veya manuel `workflow_dispatch` ile çalışır. Yayın, doğrulama işi başarıyla tamamlandıktan sonra GitHub Pages ortamına yapılır.
+Bağımsız repo olarak yayınlanırken `.github/workflows/pages.yml` test, format, typecheck, build ve Chromium UI doğrulamasını deploy önüne koyar. GitHub repository **Settings → Pages → Source: GitHub Actions** seçili olmalıdır. Workflow `main` push veya manuel `workflow_dispatch` ile çalışır. Yayın, doğrulama işi başarıyla tamamlandıktan sonra GitHub Pages ortamına yapılır.
 
 ## Doğrulama
 
