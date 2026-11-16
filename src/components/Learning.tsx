@@ -8,7 +8,7 @@ import {
   Target,
   X,
 } from "lucide-react";
-import { CASES, COMPONENTS, LABS, QUESTIONS } from "../content.ts";
+import { CASES, COMPONENTS, LABS, QUESTIONS, gradeAnswer } from "../content.ts";
 import type { Solution, State } from "../sim/types.ts";
 import { fmt, Note, Panel } from "./Controls.tsx";
 export interface Progress {
@@ -287,11 +287,9 @@ export function Quiz({
   const [index, setIndex] = useState(0),
     [choice, setChoice] = useState(""),
     [graded, setGraded] = useState<boolean | null>(null);
-  const question = QUESTIONS[index],
-    normalize = (s: string) =>
-      s.trim().toUpperCase().replace(/\s+/g, "").replace(/，/g, ",");
+  const question = QUESTIONS[index];
   const submit = () => {
-    const correct = normalize(choice) === normalize(question.answer);
+    const correct = gradeAnswer(question, choice);
     setGraded(correct);
     answer(index, correct);
   };

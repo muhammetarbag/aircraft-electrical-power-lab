@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { ArrowRight, Crosshair, HelpCircle, Search, Zap } from "lucide-react";
 import { NAMES } from "../sim/catalog.ts";
-import type { Solution, State } from "../sim/types.ts";
+import type { Edge, Solution, State } from "../sim/types.ts";
 import { fmt, Meter, Note, type Dispatch } from "./Controls.tsx";
 
 const POS: Record<string, [number, number]> = {
@@ -76,6 +76,11 @@ const CONTACT_LABEL: Record<string, string> = {
   acessFeed: "AC ESS FEED",
   dcessFeed: "DC ESS FEED",
 };
+const edgeName = (e: Edge) =>
+  CONTACT_LABEL[e.id] ??
+  (e.id.startsWith("cb-")
+    ? `${NAMES[e.to]} CB`
+    : `${NAMES[e.from]} → ${NAMES[e.to]}`);
 // Default label sits above the contactor; these would land on a node caption there.
 const CONTACT_LABEL_AT: Record<string, [number, number, "start" | "middle"]> = {
   apu1: [27, 3, "start"],
@@ -392,7 +397,7 @@ export function Inspector({
   const [showWhy, setShowWhy] = useState(false);
   const n = q.nodes[selected],
     e = q.edges.find((e) => e.id === selected);
-  const title = n?.name || selected.toUpperCase();
+  const title = n?.name || (e ? edgeName(e) : selected.toUpperCase());
   const onContactor = () => {
     if (selected === "tie" || selected === "dcTie")
       send({
@@ -462,7 +467,7 @@ export function Inspector({
           <optgroup label="Kontaktörler & feeder / CB">
             {q.edges.map((edge) => (
               <option key={edge.id} value={edge.id}>
-                {edge.id}
+                {edgeName(edge)}
               </option>
             ))}
           </optgroup>

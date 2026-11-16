@@ -556,7 +556,7 @@ export const QUESTIONS: Question[] = [
   ),
   mc(
     "Batarya",
-    "Batarya deşarj hızı hangi büyüklüğe bağlıdır?",
+    "Bataryadan çekilen enerji (Wh) hangi büyüklüklere bağlıdır?",
     "Sağladığı güç ve geçen süre",
     ["Yalnız simülasyon ekranı", "Yalnız frekans"],
     "Wh tüketimi W × saat integraliyle hesaplanır.",
@@ -765,6 +765,16 @@ export const QUESTIONS: Question[] = [
     explanation: "Kaynak → AC dağıtım → dönüşüm → DC dağıtım.",
   },
 ];
+
+const normalize = (s: string) =>
+  s.trim().toUpperCase().replace(/\s+/g, "").replace(/，/g, ",");
+/** Numeric answers compare by value: "30", "30.0" and "30,0" are equal. */
+export function gradeAnswer(q: Question, value: string): boolean {
+  if (q.options || q.category.includes("sıralama"))
+    return normalize(value) === normalize(q.answer);
+  const n = Number(value.trim().replace(",", "."));
+  return value.trim() !== "" && n === Number(q.answer);
+}
 
 export const COMPONENTS = [
   [

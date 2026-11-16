@@ -276,8 +276,12 @@ def run() -> None:
         ok('schematic zoom and reset work')
         page.get_by_role('button', name='gcb1 kontaktör CLOSED', exact=True).focus()
         page.keyboard.press('Enter')
-        expect(page.locator('.inspector h3')).to_have_text('GCB1')
+        expect(page.locator('.inspector h3')).to_have_text('GCB 1')
+        for edge_id, title in [('dcTie', 'DC TIE'), ('cb-nav', 'NAV Receiver CB'), ('tru1Input', 'AC BUS 1 → TRU 1')]:
+            page.get_by_label('İncelenecek bileşen', exact=True).select_option(edge_id)
+            expect(page.locator('.inspector h3')).to_have_text(title)
         ok('SVG contactor supports keyboard selection')
+        ok('inspector titles contactors and feeders with readable names')
         with page.expect_download() as result:
             page.get_by_role('button', name='Olay kaydını indir', exact=True).click()
         result.value.save_as(ARTIFACTS / 'events-export.txt')
